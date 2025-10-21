@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
-const User = require('../models/models_index'); // Correctly import the User model
+const User = require('../models/user'); // Correctly import the User model
 
 // This route handles new user registration
 // It's the equivalent of your POST logic in the `auth()` function in app.py
