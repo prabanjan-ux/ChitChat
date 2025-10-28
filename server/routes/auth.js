@@ -1,65 +1,73 @@
 const express = require('express');
 const router = express.Router();
+const User = require('../models/user');
 const jwt = require('jsonwebtoken');
-const User = require('../models/user'); // Correctly import the User model
 
-// This route handles new user registration
-// It's the equivalent of your POST logic in the `auth()` function in app.py
+// --- REGISTER ---
 router.post('/register', async (req, res) => {
-    try {
-        const { username, email, password } = req.body;
+  try {
+    const { username, email, password } = req.body;
 
-        // Check if a user with that email already exists
-        const existingUser = await User.findOne({ where: { email } });
-        if (existingUser) {
-            return res.status(400).json({ message: "Email already registered!" });
-        }
-
-        // Create the new user. The 'beforeCreate' hook in the model will hash the password.
-        const user = await User.create({ username, email, password });
-        
-        // Send a success response
-        res.status(201).json({ message: "Registration successful! Please log in." });
-
-    } catch (error) {
-        res.status(500).json({ message: "Error registering user", error: error.message });
+    // --- Check if email already exists ---
+    const existingEmail = await User.findOne({ where: { email } });
+    if (existingEmail) {
+      return res.status(400).json({ message: 'Email already registered' });
     }
+
+    // --- Check if username already exists ---
+    const existingUsername = await User.findOne({ where: { username } });
+    if (existingUsername) {
+      return res.status(400).json({ message: 'Username already taken' });
+    }
+
+    // --- Create new user ---
+    const newUser = await User.create({ username, email, password });
+
+    // --- Auto-login after registration ---
+    const token = jwt.sign({ id: newUser.id }, process.env.JWT_SECRET, { expiresIn: '1h' });
+
+    // --- Send success response with token ---
+    res.status(201).json({
+      message: 'User registered successfully',
+      token,
+      user: {
+        id: newUser.id,
+        username: newUser.username,
+        email: newUser.email,
+      },
+    });
+  } catch (error) {
+    console.error('Register Error:', error);
+    res.status(500).json({ message: 'Server error during registration', error: error.message });
+  }
 });
 
-// This route handles user login
-// It's the equivalent of your `login()` function in app.py
+// --- LOGIN ---
 router.post('/login', async (req, res) => {
-    try {
-        const { email, password } = req.body;
+  try {
+    const { email, password } = req.body;
 
-        // Find the user by their email
-        const user = await User.findOne({ where: { email } });
-        if (!user) {
-            return res.status(401).json({ message: "Invalid credentials!" });
-        }
+    const user = await User.findOne({ where: { email } });
+    if (!user) return res.status(400).json({ message: 'User not found' });
 
-        // Use the method we will add to the model to check the password
-        const isMatch = await user.isValidPassword(password);
-        if (!isMatch) {
-            return res.status(401).json({ message: "Invalid credentials!" });
-        }
-        
-        // If credentials are correct, create a JSON Web Token (JWT)
-        const token = jwt.sign(
-            { id: user.id, username: user.username },
-            process.env.JWT_SECRET, // The secret key from our .env file
-            { expiresIn: '1d' } // The token will be valid for 1 day
-        );
+    const isValid = await user.isValidPassword(password);
+    if (!isValid) return res.status(400).json({ message: 'Invalid password' });
 
-        // Send the token and user info back to the client
-        res.json({
-            token,
-            user: { id: user.id, username: user.username, email: user.email }
-        });
+    const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, { expiresIn: '1h' });
 
-    } catch (error) {
-        res.status(500).json({ message: "Error logging in", error: error.message });
-    }
+    res.json({
+      message: 'Login successful',
+      token,
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+      },
+    });
+  } catch (error) {
+    console.error('Login Route Error:', error);
+    res.status(500).json({ message: 'Server error during login', error: error.message });
+  }
 });
 
 module.exports = router;

@@ -2,47 +2,69 @@ const { DataTypes } = require('sequelize');
 const sequelize = require('../config/db');
 const bcrypt = require('bcryptjs');
 
-const User = sequelize.define('User',{
+const User = sequelize.define(
+  'User',
+  {
+    id: {
+      type: DataTypes.INTEGER,
+      primaryKey: true,
+      autoIncrement: true,
+    },
     username: {
-        type: DataTypes.STRING,
-        allowNull: false,
-        unique: true
+      type: DataTypes.STRING,
+      allowNull: false,
+      unique: true,
     },
     email: {
-        type: DataTypes.STRING,
-        allowNull: false,
-        unique: true,
-        validate: {
-            isEmail: true
-        }
+      type: DataTypes.STRING,
+      allowNull: false,
+      unique: true,
+      validate: {
+        isEmail: true,
+      },
     },
-    password:{
-        type: DataTypes.STRING,
-        allowNull: false
-    }
-},{
+    password: {
+      type: DataTypes.STRING,
+      allowNull: false,
+    },
+    is_online: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+    },
+    last_seen: {
+      type: DataTypes.DATE,
+      defaultValue: null,
+    },
+  },
+  {
     tableName: 'users',
-    timestamps:true,
-    hooks:{
-        beforeCreate: async(user)=>{
-            if(user.password) {
-                const salt = await bcrypt.genSalt(10);
-                // FIX: Changed 'users.password' to 'user.password'
-                user.password = await bcrypt.hash(user.password, salt);
-            }
+    timestamps: true, // adds createdAt and updatedAt automatically
+    hooks: {
+      beforeCreate: async (user) => {
+        if (user.password) {
+          const salt = await bcrypt.genSalt(10);
+          user.password = await bcrypt.hash(user.password, salt);
         }
-    }
-});
+      },
+      beforeUpdate: async (user) => {
+        if (user.changed('password')) {
+          const salt = await bcrypt.genSalt(10);
+          user.password = await bcrypt.hash(user.password, salt);
+        }
+      },
+    },
+  }
+);
 
-// --- ADDED THIS METHOD ---
-// This adds an 'isValidPassword' method to every User instance
-// It's used by auth.js to compare the login password with the hashed password
-User.prototype.isValidPassword = async function(password) {
-    try {
-        return await bcrypt.compare(password, this.password);
-    } catch (error) {
-        throw new Error(error);
-    }
+// --- INSTANCE METHOD ---
+// Compare plain password with hashed password in DB
+User.prototype.isValidPassword = async function (password) {
+  try {
+    return await bcrypt.compare(password, this.password);
+  } catch (error) {
+    throw new Error(error);
+  }
 };
+
 
 module.exports = User;
