@@ -1,47 +1,27 @@
-const { DataTypes } = require('sequelize');
-const sequelize = require('../config/db');
-const User = require('./user'); 
+// models/message.js
 
-const Message = sequelize.define(
-  'Message',
+const mongoose = require('mongoose');
+
+const MessageSchema = new mongoose.Schema(
   {
-    id: {
-      type: DataTypes.INTEGER,
-      primaryKey: true,
-      autoIncrement: true,
-    },
     sender_id: {
-      type: DataTypes.INTEGER,
-      allowNull: false,
-      references: {
-        model: User,
-        key: 'id',
-      },
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
     },
     receiver_id: {
-      type: DataTypes.INTEGER,
-      allowNull: false,
-      references: {
-        model: User,
-        key: 'id',
-      },
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
     },
     text: {
-      type: DataTypes.TEXT,
-      allowNull: false,
-    },
-    timestamp: {
-      type: DataTypes.DATE,
-      defaultValue: DataTypes.NOW,
+      type: String,
+      required: true,
     },
   },
   {
-    tableName: 'messages',
-    timestamps: false, // since we already have a custom timestamp field
+    timestamps: true,
   }
 );
 
-Message.belongsTo(User, { as: 'sender', foreignKey: 'sender_id' });
-Message.belongsTo(User, { as: 'receiver', foreignKey: 'receiver_id' });
-
-module.exports = Message;
+module.exports = mongoose.model('Message', MessageSchema);

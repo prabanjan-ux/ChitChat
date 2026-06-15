@@ -8,36 +8,29 @@ router.post('/register', async (req, res) => {
   try {
     const { username, email, password } = req.body;
 
-    // --- Check if email already exists ---
-    const existingEmail = await User.findOne({ where: { email } });
-    if (existingEmail) {
-      return res.status(400).json({ message: 'Email already registered' });
+    // --- Check if email or username already exists ---
+    const existingUser = await User.findOne({ $or: [{ email }, { username }] });
+    if (existingUser) {
+      const message = existingUser.email === email ? 'Email already registered' : 'Username already taken';
+      return res.status(400).json({ message });
     }
 
-    // --- Check if username already exists ---
-    const existingUsername = await User.findOne({ where: { username } });
-    if (existingUsername) {
-      return res.status(400).json({ message: 'Username already taken' });
-    }
+    // --- Create and save new user ---
+    const newUser = new User({ username, email, password });
+    await newUser.save();
 
-    // --- Create new user ---
-    const newUser = await User.create({ username, email, password });
+    const token = jwt.sign({ id: newUser._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
 
-    // --- Auto-login after registration ---
-    const token = jwt.sign({ id: newUser.id }, process.env.JWT_SECRET, { expiresIn: '1h' });
-
-    // --- Send success response with token ---
     res.status(201).json({
       message: 'User registered successfully',
       token,
       user: {
-        id: newUser.id,
+        id: newUser._id.toString(), // Mongoose uses _id
         username: newUser.username,
         email: newUser.email,
       },
     });
   } catch (error) {
-    console.error('Register Error:', error);
     res.status(500).json({ message: 'Server error during registration', error: error.message });
   }
 });
@@ -47,25 +40,24 @@ router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    const user = await User.findOne({ where: { email } });
-    if (!user) return res.status(400).json({ message: 'User not found' });
+    const user = await User.findOne({ email });
+    if (!user) return res.status(400).json({ message: 'Invalid credentials' });
 
     const isValid = await user.isValidPassword(password);
-    if (!isValid) return res.status(400).json({ message: 'Invalid password' });
+    if (!isValid) return res.status(400).json({ message: 'Invalid credentials' });
 
-    const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
 
     res.json({
       message: 'Login successful',
       token,
       user: {
-        id: user.id,
+        id: user._id.toString(), // Mongoose uses _id
         username: user.username,
         email: user.email,
       },
     });
   } catch (error) {
-    console.error('Login Route Error:', error);
     res.status(500).json({ message: 'Server error during login', error: error.message });
   }
 });
